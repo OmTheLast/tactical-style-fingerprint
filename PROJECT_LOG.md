@@ -361,3 +361,83 @@ Fields used:
 - The PPDA-style Option 1 remains documented as a possible later comparison or robustness metric.
 - PPDA was not combined with this feature and has not been implemented.
 - Tactical feature #4 was not started.
+
+## 2026-08-20 — Attacking Width definition investigation
+
+### Status
+
+- Tactical feature #3 was committed and pushed as commit `915c988` before beginning this investigation.
+- Investigated three event-data definitions for tactical feature #4:
+  1. mean lateral distance of final-third pass and carry destinations;
+  2. wide-channel share of final-third entries;
+  3. continuously attack-weighted mean lateral distance.
+- No Attacking Width definition has been selected or implemented yet.
+
+### Data and coordinate audit
+
+- StatsBomb's pitch is 120 by 80 units, with the horizontal centre line at `y = 40`. The penalty-area outer edges are marked at `y = 18` and `y = 62`.
+- Absolute lateral distance `abs(y - 40)` is unchanged when coordinates rotate between teams as `y -> 80 - y`, so it measures distance from the centre without treating the left and right flanks differently.
+- The season contains 329,685 non-restart Pass attempts and 276,949 Carry events. Every inspected Pass has `pass.end_location`, and every Carry has `carry.end_location`.
+- There are 110,587 eligible Pass endpoints and 84,876 Carry endpoints in the final third (`end_x >= 80`).
+- There are 40,420 pass and 12,624 carry entries crossing from `start_x < 80` to `end_x >= 80`; 21,950 pass entries and 6,420 carry entries end outside the penalty-area-width boundaries (`y <= 18` or `y >= 62`).
+- Ball Receipt locations are available but would largely repeat Pass destinations. Shots naturally concentrate centrally and can mix width with chance creation. Dribbles have a start location but no comparable movement endpoint. These events are therefore not recommended for the initial endpoint-based definitions.
+
+### Options under consideration
+
+- **Mean final-third destination width:** mean `abs(end_y - 40)` over non-restart Pass attempts and Carries ending at `x >= 80`. This has no arbitrary lateral channel boundary, although it retains the standard final-third threshold.
+- **Wide-channel share of final-third entries:** Passes and Carries crossing from `start_x < 80` to `end_x >= 80`, with the numerator restricted to endpoints at `y <= 18` or `y >= 62`. The lateral thresholds are linked to the penalty-area edges but remain a modelling choice.
+- **Attack-weighted mean lateral distance:** `sum((end_x / 120) * abs(end_y - 40)) / sum(end_x / 120)` over all eligible Pass and Carry endpoints. This has no hard x or y thresholds, but its linear attacking weight is less intuitive and is itself a modelling assumption.
+- All options would include successful and unsuccessful non-restart Pass attempts to represent intended attacking direction and would include Carry endpoints to capture width created by ball carrying.
+- Pass endpoints and Ball Receipt events should not both be counted, because they often describe the same movement destination.
+
+### Current recommendation and limitations
+
+- Mean final-third destination width is the current V1 recommendation because it directly describes attacking locations, is easy to audit, does not reduce width to crossing, and avoids an arbitrary wide/not-wide lateral cutoff.
+- Pooling Pass and Carry endpoints means action mix affects the score, and each recorded action receives equal weight.
+- None of the options measures the actual width of the full team, winger/full-back positioning without the ball, pitch occupation, switches that were available but not attempted, or continuous team shape.
+- No implementation should begin until an option is selected.
+
+## 2026-08-20 — Tactical feature #4: Mean Final-Third Destination Width
+
+### Decision
+
+- Selected the mean final-third destination option. The tactical dimension is labelled **Attacking Width**, while the underlying raw metric remains **Mean Final-Third Destination Width**.
+- The claim is deliberately limited to **width of recorded final-third ball destinations**, not true team shape or formation width.
+- For every eligible non-restart Pass or Carry ending at `end_x >= 80`, the event value is `abs(end_y - 40)`.
+- The team score is the arithmetic mean of those event values, pooling Pass and Carry endpoints with equal event weight.
+- Successful and unsuccessful Pass attempts are included to preserve attacking intent.
+- Passes explicitly typed `Corner`, `Free Kick`, `Goal Kick`, `Kick Off`, or `Throw-in` are excluded.
+- Ball Receipts are excluded to avoid duplicating Pass endpoints. Shots and Dribbles are not included.
+- The raw score remains in StatsBomb pitch-coordinate units and has not been normalized.
+
+### One-match implementation and validation
+
+- Added `analysis/attacking_width_one_match.py` for Manchester United vs Tottenham Hotspur, match `3754097`.
+- Manchester United: 136 qualifying Pass endpoints, 119 Carry endpoints, 255 total endpoints, mean width 23.50.
+- Tottenham Hotspur: 104 qualifying Pass endpoints, 62 Carry endpoints, 166 total endpoints, mean width 18.47.
+- Inspected examples from both teams and both event types, including central and touchline-adjacent endpoints, and manually verified their `abs(end_y - 40)` values.
+- Confirmed that all Pass and Carry events have endpoint lists containing at least x and y coordinates.
+- Confirmed that every selected endpoint has non-missing x/y values, `end_x >= 80`, and `0 <= end_y <= 80`.
+- Confirmed that none of the five explicit restart Pass types survived the filter.
+- Confirmed for every qualifying event that `abs(y - 40)` equals `abs((80 - y) - 40)` within floating-point tolerance. Left/right coordinate rotation therefore does not change the metric.
+- Only after these checks passed was the unchanged definition extended to the season.
+
+### Full-season implementation
+
+- Added `analysis/attacking_width_season.py` and saved its output to `data/processed/mean_final_third_destination_width_2015_16.csv`.
+- Aggregated the sum of lateral distances and endpoint counts across the season before dividing; match means were not averaged.
+- The complete sample contains 110,587 qualifying Pass endpoints and 84,876 qualifying Carry endpoints, for 195,463 total endpoints.
+- All 20 teams have complete 38/38 match coverage, positive Pass and Carry endpoint counts, and mean values within the valid 0-to-40 range. No team received a suspicious-data flag.
+- Norwich City ranked first at 22.95, followed by Manchester United at 22.79 and AFC Bournemouth at 22.70.
+- Liverpool (20.74), Tottenham Hotspur (20.59), and Sunderland (20.32) had the three lowest raw means.
+
+### Interpretation and limitations
+
+- A high value means the team's recorded advanced Pass/Carry destinations tend to be farther from the pitch centre and therefore wider.
+- A low value means those recorded destinations tend to be more central. High is not better and low is not worse.
+- This does not measure the physical width of the full formation. Event data cannot observe a winger holding a wide position without receiving the ball; continuous player-location or tracking data would be required for that claim.
+- Passes and Carries receive equal event weight, so short Carry events may affect teams differently from pass-heavy teams.
+- `end_x >= 80` is a hard final-third boundary.
+- The metric records where selected attacking actions end, not whether they are useful, dangerous, or successful.
+- It cannot observe off-ball positioning and does not distinguish productive width from harmless wide circulation.
+- Tactical feature #5, similarity modelling, normalization, AI explanations, frontend work, and deployment were not started.

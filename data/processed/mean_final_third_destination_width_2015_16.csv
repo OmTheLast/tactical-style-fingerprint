@@ -1,0 +1,21 @@
+rank,team,matches_represented,expected_matches,qualifying_pass_endpoints,qualifying_carry_endpoints,total_qualifying_endpoints,mean_final_third_destination_width,coverage_flag,data_quality_flag
+1,Norwich City,38,38,5526,4044,9570,22.950,OK,OK
+2,Manchester United,38,38,6890,5595,12485,22.789,OK,OK
+3,AFC Bournemouth,38,38,5442,4465,9907,22.702,OK,OK
+4,Crystal Palace,38,38,4801,3574,8375,22.473,OK,OK
+5,West Ham United,38,38,4754,3814,8568,22.350,OK,OK
+6,Leicester City,38,38,4940,3551,8491,22.273,OK,OK
+7,Newcastle United,38,38,4637,3410,8047,22.225,OK,OK
+8,Manchester City,38,38,7464,6333,13797,22.180,OK,OK
+9,Swansea City,38,38,4965,3853,8818,22.034,OK,OK
+10,Aston Villa,38,38,4778,3727,8505,21.984,OK,OK
+11,West Bromwich Albion,38,38,4702,3128,7830,21.721,OK,OK
+12,Southampton,38,38,5863,4152,10015,21.574,OK,OK
+13,Chelsea,38,38,6605,5423,12028,21.281,OK,OK
+14,Stoke City,38,38,4835,3516,8351,21.092,OK,OK
+15,Everton,38,38,5696,4543,10239,20.948,OK,OK
+16,Arsenal,38,38,7225,5838,13063,20.927,OK,OK
+17,Watford,38,38,4848,3329,8177,20.921,OK,OK
+18,Liverpool,38,38,6318,4830,11148,20.740,OK,OK
+19,Tottenham Hotspur,38,38,5893,4731,10624,20.587,OK,OK
+20,Sunderland,38,38,4405,3020,7425,20.317,OK,OK
