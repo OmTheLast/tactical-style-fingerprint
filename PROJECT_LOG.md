@@ -194,3 +194,82 @@ Tottenham's value changed from 35.0% in the inspected Manchester United match to
 - Opponent counts are specific to the 38 fixtures played by each team; they are not a generic league-average denominator.
 - Complete file coverage confirms that the pipeline processed the expected matches. It does not prove that every provider event is perfectly collected or classified.
 - No new tactical metric was introduced.
+
+## 2026-08-20 — Directness definition investigation
+
+### Status
+
+- Tactical feature #1 was committed and pushed before beginning this investigation.
+- Three event-data definitions of directness were proposed for discussion:
+  1. distance-weighted attempted-pass verticality;
+  2. progressive-action attempt share using passes and carries;
+  3. possession-level net progression speed.
+- No directness calculation has been implemented and no definition has been selected yet.
+
+### Current recommendation
+
+- **Distance-weighted attempted-pass verticality** is the recommended hackathon V1 option because it is transparent, threshold-free, inexpensive to calculate, and uses attempted rather than completed passes. This makes it primarily a measure of directional intent rather than passing success.
+- Its main limitation is that it describes passing direction only and does not include ball carrying or the tempo of whole possessions.
+
+### Decision still required
+
+- Choose whether directness should primarily mean pass direction, frequency of large progressive actions, or speed of whole-possession progression.
+- Decide how to exclude explicit restarts from the eligible action set. No implementation should begin before this definition is chosen.
+
+## 2026-08-20 — Tactical feature #2: Pass Verticality
+
+### Decision
+
+- Selected the distance-weighted attempted-pass definition and named it **Pass Verticality**, rather than general directness.
+- The fixed formula is:
+
+  `sum(pass end x - pass start x) / sum(pass length)`
+
+- The value is a dimensionless ratio. Multiplying it by 100 expresses the net forward component as a percentage of all eligible attempted passing distance.
+- Included successful and unsuccessful attempts so that the feature represents directional passing intent without directly rewarding completion quality.
+- Excluded passes whose explicit `pass.type.name` is `Corner`, `Free Kick`, `Goal Kick`, `Kick Off`, or `Throw-in`.
+- Retained ordinary passes and passes labelled `Recovery` or `Interception`, because those are open-play origins rather than explicit restarts.
+- The exclusion applies to the restart pass itself, not every later pass in a possession that began with a restart.
+
+Fields used:
+
+- `type.name` to select Pass events;
+- `pass.type.name` to exclude explicit restarts;
+- `location[0]` and `pass.end_location[0]` to calculate forward displacement;
+- `pass.length` as the distance denominator;
+- `team.name` for aggregation;
+- `pass.outcome.name` only to validate that both completed and unsuccessful attempts are included;
+- `pass.angle` for an independent trigonometric validation check.
+
+### One-match implementation and validation
+
+- Added `analysis/pass_verticality_one_match.py` for Manchester United vs Tottenham Hotspur, match `3754097`.
+- Manchester United: 500 eligible attempts, 91 unsuccessful; 2,719.6 net forward units over 10,967.8 total pass-distance units; Pass Verticality 0.248, or 24.8%.
+- Tottenham Hotspur: 492 eligible attempts, 112 unsuccessful; 3,271.5 net forward units over 11,065.7 total pass-distance units; Pass Verticality 0.296, or 29.6%.
+- Confirmed that every eligible pass had its required start x, end x, length, and angle fields.
+- Confirmed that none of the five excluded restart types remained.
+- Recalculated each pass's forward component as `pass.length * cos(pass.angle)`. Its team-level sum matched the coordinate-derived `end_x - start_x` sum, validating the coordinate calculation and orientation assumption.
+- Only after these checks passed was the unchanged calculation extended to the season.
+
+### Full-season implementation
+
+- Added `analysis/pass_verticality_season.py` and saved the ranked output to `data/processed/pass_verticality_2015_16.csv`.
+- Aggregated numerator and denominator separately over all matches, then divided. This is a ratio of season totals, not a mean of match ratios.
+- All 20 teams have complete 38/38 match coverage.
+- Leicester City ranked first at 44.5%, followed by Sunderland at 44.3% and West Bromwich Albion at 42.6%.
+- Manchester City ranked 19th at 28.1%, and Manchester United ranked 20th at 27.9%.
+- The season coordinate and angle-derived numerators differed by at most 0.0005 pitch units per team, which is negligible floating-point/recording precision error.
+
+### Interpretation and limitations
+
+- A high value means a larger proportion of attempted passing distance points toward the opponent's goal; a low value means more passing distance is lateral or backward.
+- Because unsuccessful attempts count, the feature does not simply reward teams for executing forward passes successfully.
+- The metric is distance-weighted: a long forward attempt affects it more than a short pass, which is intentional but can make hopeful long balls influential.
+- Forward and backward distances cancel in the numerator, while every eligible pass adds positive length to the denominator.
+- It measures passing direction only. It does not include carries, possession tempo, time taken, pressure, zone, attack success, or continuous player/ball movement.
+- It should not be described as a complete measure of general directness or attacking quality.
+
+### Deferred option
+
+- The earlier possession-level option has not been discarded. It remains documented as a possible later **possession progression/transition-speed** feature based on net x-progression and elapsed event time within a StatsBomb possession.
+- That feature was not implemented, and no other tactical feature was started.
