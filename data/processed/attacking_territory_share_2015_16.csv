@@ -1,0 +1,21 @@
+rank,team,matches_represented,expected_matches,qualifying_team_passes,qualifying_opponent_passes,attacking_territory_share_pct,coverage_flag
+1,Manchester United,38,38,4516,2068,68.6,OK
+2,Manchester City,38,38,5173,2455,67.8,OK
+3,Arsenal,38,38,4759,2765,63.3,OK
+4,Chelsea,38,38,4305,2718,61.3,OK
+5,Liverpool,38,38,3694,2601,58.7,OK
+6,Tottenham Hotspur,38,38,3494,2562,57.7,OK
+7,AFC Bournemouth,38,38,3389,3022,52.9,OK
+8,Southampton,38,38,3217,3129,50.7,OK
+9,Everton,38,38,3431,3692,48.2,OK
+10,Norwich City,38,38,3183,3629,46.7,OK
+11,West Ham United,38,38,2705,3116,46.5,OK
+12,Swansea City,38,38,2831,3326,46.0,OK
+13,Aston Villa,38,38,2808,3575,44.0,OK
+14,Stoke City,38,38,2538,3332,43.2,OK
+15,Leicester City,38,38,2503,3461,42.0,OK
+16,Watford,38,38,2491,3501,41.6,OK
+17,Crystal Palace,38,38,2481,3597,40.8,OK
+18,Newcastle United,38,38,2514,3930,39.0,OK
+19,West Bromwich Albion,38,38,2386,4116,36.7,OK
+20,Sunderland,38,38,2068,3891,34.7,OK

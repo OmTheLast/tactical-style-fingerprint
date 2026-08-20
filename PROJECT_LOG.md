@@ -85,3 +85,112 @@ This file records work actually completed, observations supported by the inspect
 ### Decision and rationale
 
 - **Separate the public project record from private learning notes:** implementation history and modelling decisions belong in the repository, while personal revision prompts should remain editable locally without being published.
+
+## 2026-08-20 — First one-match tactical feature: attacking-territory share
+
+### Completed
+
+- Verified the StatsBomb pitch convention before applying a territorial threshold:
+  - event coordinates use a 120-by-80 grid;
+  - the halfway line is `x = 60`;
+  - attacking actions are normalized toward the high-`x` goal at `x = 120`;
+  - therefore the attacking third begins at `x = 80` for both teams;
+  - as an additional match-level sanity check, shots by both teams in both halves occurred near the high-`x` goal.
+- Loaded match `3754097` into pandas with `pd.json_normalize`.
+- Implemented one transparent event-based territorial feature in `analysis/field_tilt_one_match.py`.
+- Validated the intermediate counts and confirmed that the two team shares sum to 100%.
+
+### Definition
+
+For this first version, **attacking-territory share** is:
+
+`team completed passes starting at x >= 80 / both teams' completed passes starting at x >= 80`
+
+The calculation includes all play patterns. A pass is treated as completed when its `pass.outcome.name` value is missing, following the StatsBomb event specification.
+
+Fields used:
+
+- `type.name` to keep Pass events;
+- `pass.outcome.name` to keep completed passes;
+- `location[0]` as the pass-start x-coordinate;
+- `team.name` to group the selected passes by team.
+
+### Result for Manchester United vs Tottenham Hotspur
+
+- Manchester United: 89 completed final-third passes, 65.0% attacking-territory share.
+- Tottenham Hotspur: 48 completed final-third passes, 35.0% attacking-territory share.
+- Total qualifying passes: 137.
+
+### Decision and rationale
+
+- **Begin with completed passes starting in the attacking third:** repeated completed passing in advanced areas is a simple, auditable proxy for sustained territorial presence. It avoids claiming to measure continuous ball or player position.
+- **Include all play patterns for the first calculation:** this keeps the first implementation small and transparent. Excluding set-piece phases remains an explicit later definition choice rather than a silent assumption.
+- **Call the feature attacking-territory share:** “field tilt” is used with several provider-specific definitions, so the descriptive name makes this implementation's exact meaning clearer.
+
+### Limitations
+
+- It ignores carries, dribbles, touches, and passes that enter the final third from just outside it.
+- It rewards pass-heavy circulation and ignores incomplete attacking-third passes, so it partly reflects retention and passing execution as well as territory.
+- Including corners, throw-ins, free kicks, and other restarts can increase a team's count without representing settled territorial control.
+- It does not measure how long the ball remained in the final third or how dangerous the possession was.
+- It is a zero-sum match share: one team's increase necessarily lowers the opponent's value.
+- One match is noisy and affected by score state, opponent, red cards, and game plan; this result is not yet a stable team fingerprint.
+- It cannot support tracking-based claims about defensive lines, compactness, shape, or off-ball positioning.
+- No other tactical features have been calculated.
+
+## 2026-08-20 — Full-season attacking-territory aggregation
+
+### Completed
+
+- Extended the unchanged attacking-territory-share filter from one match to all 380 matches in the 2015/16 Premier League.
+- Added `scripts/download_season_events.py` to download and locally cache missing StatsBomb event files.
+- Added `analysis/attacking_territory_share_season.py` to process the cached matches one at a time and aggregate team and opponent counts.
+- Added `requirements.txt` with the two dependencies currently used: pandas and certifi.
+- Added `data/raw/` to `.gitignore`; downloaded provider data is treated as a reproducible local cache rather than repository source.
+- Downloaded 379 missing event files and reused the one previously inspected file, producing complete coverage of 380 matches.
+- Saved the ranked result to `data/processed/attacking_territory_share_2015_16.csv`.
+
+### Download issue and resolution
+
+- The first standard-library HTTPS attempt failed certificate verification because the local Python installation did not locate a trusted CA certificate bundle.
+- SSL verification was not disabled. The downloader was updated to use the installed certifi CA bundle through an explicit `ssl.SSLContext`, after which all missing files downloaded successfully.
+- Downloads are written to a temporary file and atomically renamed after the response parses as a JSON list. Existing valid files are reused; invalid cached files are downloaded again.
+
+### Season aggregation method
+
+For each team, the season value is:
+
+`sum of the team's qualifying passes / (sum of the team's qualifying passes + sum of its opponents' qualifying passes in those fixtures)`
+
+This is a ratio of season totals, not the arithmetic mean of match-level percentages. A ratio of totals weights matches according to the amount of qualifying event evidence they contain; a simple mean would give a low-event match and a high-event match equal influence.
+
+The qualifying event definition was not changed:
+
+- event type is Pass;
+- pass outcome is missing, meaning completed;
+- pass starts at `x >= 80`;
+- all play patterns remain included.
+
+### Coverage validation
+
+- Match metadata contains 380 matches and 20 teams.
+- Every team is expected to play 38 matches.
+- Every team was represented in 38 processed event files.
+- No team received an incomplete-coverage flag.
+- The sum of team qualifying counts equals the sum of opponent qualifying counts, because every qualifying pass belongs to one team and is an opponent event for the other team in that match.
+
+### Ranked result
+
+The top five teams were Manchester United (68.6%), Manchester City (67.8%), Arsenal (63.3%), Chelsea (61.3%), and Liverpool (58.7%). The bottom five were Watford (41.6%), Crystal Palace (40.8%), Newcastle United (39.0%), West Bromwich Albion (36.7%), and Sunderland (34.7%).
+
+Manchester City had the largest raw qualifying team-pass count (5,173), but Manchester United ranked first in share because United combined 4,516 team passes with only 2,068 opponent passes. This confirms that the feature measures the relative balance of advanced passing in a team's matches, not simply its own attacking-third pass volume.
+
+Tottenham's value changed from 35.0% in the inspected Manchester United match to 57.7% over the complete season, demonstrating why a single match should not be treated as a stable team fingerprint.
+
+### Methodological cautions
+
+- Aggregating 38 matches reduces random one-match variation but does not remove score-state, opponent, set-piece, or passing-completion effects.
+- A ratio of totals can be influenced more by matches with many qualifying passes. That is intentional for this version but should remain documented.
+- Opponent counts are specific to the 38 fixtures played by each team; they are not a generic league-average denominator.
+- Complete file coverage confirms that the pipeline processed the expected matches. It does not prove that every provider event is perfectly collected or classified.
+- No new tactical metric was introduced.

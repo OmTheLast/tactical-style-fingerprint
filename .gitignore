@@ -1,2 +1,9 @@
 # Local learning notes are intentionally private and must never be committed.
 private_notes/
+
+# Python cache files are generated locally and should not be versioned.
+__pycache__/
+*.py[cod]
+
+# Downloaded provider data is a reproducible local cache, not repository source.
+data/raw/
