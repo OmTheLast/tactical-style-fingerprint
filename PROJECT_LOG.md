@@ -273,3 +273,91 @@ Fields used:
 
 - The earlier possession-level option has not been discarded. It remains documented as a possible later **possession progression/transition-speed** feature based on net x-progression and elapsed event time within a StatsBomb possession.
 - That feature was not implemented, and no other tactical feature was started.
+
+## 2026-08-20 — Pressing Intensity definition investigation
+
+### Status
+
+- Tactical feature #2 was committed and pushed as commit `121fc84` before beginning this investigation.
+- Investigated two possible event-data definitions for tactical feature #3:
+  1. an open-data PPDA-style reconstruction;
+  2. high-zone StatsBomb Pressure events per 100 opposition pass attempts.
+- No pressing feature has been selected or implemented yet.
+
+### Data availability audit
+
+- All 380 event files contain 368,619 Pass events, 115,402 Pressure events, 15,445 Duel events of type Tackle, 8,920 Interception events, and 9,512 Foul Committed events.
+- Every event in those inspected categories has the required `location`, `team`, and `possession_team` objects. Every Pressure also has `duration`.
+- The data includes 24,224 Pressure events marked `counterpress`, but this field is not required by either proposed definition.
+- There are 304 Foul Committed events explicitly marked `foul_committed.offensive`; these can be excluded from a defensive-action denominator.
+
+### Coordinate and team attribution verification
+
+- The StatsBomb specification defines a 120 by 80 coordinate system and states that pass angle zero points toward the event team's attacking goal.
+- Previous shot and pass checks confirmed that high x is toward the acting team's attacking goal.
+- Related Pressure and opponent on-ball events in match `3754097` were inspected. Their coordinates approximately rotate as `(x, y)` versus `(120 - x, 80 - y)`, allowing for the pressure starting at a nearby rather than identical position.
+- Therefore a defensive action at `x >= 48` from the defending/acting team's frame corresponds to an opponent pass in the same physical zone at `x <= 72` from the passer's frame.
+- `team.name` identifies the team performing the event and is the correct field for attributing the action. `possession_team.name` labels StatsBomb's possession chain and must not be treated as the coordinate frame or as a guaranteed current-ball-owner test.
+- The season confirms this caution: 97,509 of 115,402 Pressure events have `team != possession_team`, but 17,893 do not. Filtering pressures only where those fields differ would silently discard recorded pressures.
+
+### Options under consideration
+
+- **PPDA-style reconstruction:** opposition non-restart attempted passes starting at `x <= 72`, divided by the team's Tackle duels, Interceptions, and non-offensive Fouls Committed at `x >= 48`. Lower means more frequent defensive actions per allowed pass and therefore more aggressive pressing.
+- **High-zone pressures per 100 passes:** 100 times the team's Pressure events at `x >= 48`, divided by opposition non-restart attempted passes starting at `x <= 72`. Higher means more recorded pressure actions per passing opportunity and therefore more aggressive pressing.
+- Explicit restart types would be excluded from either pass denominator because StatsBomb represents several restarts as Pass events while the intended opportunity set is open play.
+- Both options would use season ratios of totals rather than averages of match ratios.
+
+### Sources and limitations noted
+
+- The original PPDA concept uses passes allowed per tackle, interception, challenge, or foul in an advanced pressing zone. Hudl StatsBomb's published metric description uses tackles, interceptions, and fouls and defines the zone from 40% of the pitch length away from the defending team's goal and forward.
+- The proposed PPDA calculation is an explicit open-data reconstruction, not a claim to reproduce StatsBomb's proprietary metric exactly.
+- Neither option observes team shape, coordinated off-ball movement, marking, press success, or all moments when a team could have pressed.
+- No implementation should begin until an option is selected.
+
+## 2026-08-20 — Tactical feature #3: High-Zone Pressures per 100 Opposition Passes
+
+### Decision
+
+- Selected the Pressure-event option and named the underlying metric **High-Zone Pressures per 100 Opposition Passes**. A future interface may use the broader tactical-dimension label **Pressing Intensity**.
+- The fixed formula is:
+
+  `100 * team qualifying high-zone Pressure events / qualifying opposition pass attempts`
+
+- A qualifying team pressure is a StatsBomb `Pressure` event starting at `x >= 48` in the pressure team's coordinate frame.
+- A qualifying opposition pass is a successful or unsuccessful `Pass` event starting at `x <= 72` in the opponent passer's coordinate frame, excluding explicit `Corner`, `Free Kick`, `Goal Kick`, `Kick Off`, and `Throw-in` pass types.
+- The output is a rate per 100 opposition passes, not a percentage. It is not capped and can theoretically exceed 100 when multiple pressures occur per passing opportunity.
+- `team.name` attributes a Pressure to the pressing team. No `team != possession_team` filter is used.
+- Numerator and denominator counts are preserved alongside every calculated rate for auditability.
+
+### One-match implementation and validation
+
+- Added `analysis/high_zone_pressures_one_match.py` for Manchester United vs Tottenham Hotspur, match `3754097`.
+- Manchester United recorded 128 qualifying high-zone pressures against 401 qualifying Tottenham passes: 31.9 pressures per 100 opposition passes.
+- Tottenham recorded 90 qualifying high-zone pressures against 358 qualifying Manchester United passes: 25.1 per 100.
+- Checked concrete qualifying examples for both event sets, including Pressure coordinates above 48 and opposition Pass coordinates below 72.
+- Confirmed that no excluded restart pass remained in the denominator.
+- Confirmed with an example at `00:08:10.209` that a valid Manchester United Pressure can have both `team.name` and `possession_team.name` equal to Manchester United. This supports the decision not to require those fields to differ.
+
+### Full-season implementation
+
+- Added `analysis/high_zone_pressures_season.py` and saved its output to `data/processed/high_zone_pressures_per_100_opposition_passes_2015_16.csv`.
+- Aggregated the raw pressure numerator and opposition-pass denominator over the season before dividing; match-level rates were not averaged.
+- All 20 teams have complete 38/38 match coverage, a non-zero denominator, and a rank from 1 to 20.
+- Liverpool ranked first with 3,777 pressures / 9,844 opposition passes = 38.4 per 100.
+- Tottenham Hotspur ranked second with 3,518 / 9,186 = 38.3 per 100.
+- Sunderland and West Bromwich Albion were lowest; both round to 24.8 per 100, from 3,025 / 12,192 and 3,060 / 12,350 respectively.
+
+### Interpretation and limitations
+
+- Higher values mean more recorded high-zone Pressure events relative to opponent passing opportunities in the corresponding physical zone.
+- The metric measures pressure activity, not success. It does not require a turnover, tackle, shot prevention, or completed defensive action.
+- Multiple players can pressure during one opponent action, so the rate can exceed 100 and must not be interpreted as a percentage.
+- The count ignores Pressure duration and may treat one long pressure differently from several short events.
+- Opponent passing style, match state, and the chosen zone boundary can affect the rate.
+- It cannot measure coordinated team shape, pressing traps, compactness, defensive-line height, or off-ball movement.
+
+### Deferred comparison
+
+- The PPDA-style Option 1 remains documented as a possible later comparison or robustness metric.
+- PPDA was not combined with this feature and has not been implemented.
+- Tactical feature #4 was not started.
