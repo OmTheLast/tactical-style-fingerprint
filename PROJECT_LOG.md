@@ -563,3 +563,53 @@ Fields used:
 - Equal scaling gives each stored column comparable numerical influence, but correlated columns can still double-count a shared tactical pattern. Five equal feature weights are a transparent MVP assumption, not a scientifically proven model of football style.
 - Any future user-facing score should be labelled a relative similarity index, not a probability or a percentage of tactical identity. Raw distance, nearest-team rank, or a documented bounded transformation can be shown without claiming that a team is a scientifically meaningful percentage “identical” to another.
 - No normalization, pairwise team distance, similarity ranking, frontend, AI explanation, or deployment work was implemented in this stage.
+
+## 2026-08-21 — Primary tactical fingerprints and similarity engine
+
+### Milestone before implementation
+
+- Committed and pushed the accepted combined raw fingerprint dataset, audit, correlation analysis, and project-log changes as commit `8ebd9dd` (`Add combined raw tactical fingerprint audit`) before beginning similarity work.
+
+### Primary fingerprint decision
+
+- Selected five-feature population z-score standardization plus Euclidean distance as the primary MVP similarity method.
+- For each raw feature across the 20 Premier League teams, calculated `z = (team_value - league_mean) / league_population_std`, using pandas population standard deviation with `ddof=0`.
+- Retained all five features with equal numerical weight: Attacking Territory, Pass Verticality, Pressing Intensity, Attacking Width, and Counterattacking Tendency.
+- Did not remove Attacking Territory or Pass Verticality. Their `-0.839` correlation means the model may partly double-weight a broader control-versus-directness axis even though their raw definitions differ.
+- Retained Attacking Width, while preserving the concern that standardization expands its narrow raw season range to unit variance and therefore gives small Width differences the same statistical scale as broader variation in the other metrics.
+
+### Implementation and auditable outputs
+
+- Added `analysis/calculate_tactical_similarity.py`.
+- Saved raw values beside their five z-scores in `data/processed/premier_league_2015_16_standardized_tactical_fingerprints.csv`.
+- Calculated every directed other-team comparison and saved all 380 rows to `data/processed/premier_league_2015_16_pairwise_tactical_distances.csv`.
+- Each pairwise row preserves total Euclidean distance plus signed and absolute z-score differences for all five features. A signed difference is the focal team's z-score minus the comparison team's z-score.
+- Saved each team's five closest neighbours to `data/processed/premier_league_2015_16_nearest_5_tactical_neighbours.csv`.
+- Smaller Euclidean distance means the two five-coordinate standardized fingerprints are closer. Distance is not a probability, percentage, or claim of tactical identity.
+
+### Validation
+
+- Every team's distance to itself is exactly zero within numerical tolerance.
+- The distance matrix is symmetric: the maximum numerical difference between A-to-B and B-to-A is zero within the reported 12 decimal places.
+- No distance is negative.
+- The long comparison table contains 380 directed other-team comparisons, exactly 19 for each team.
+- Every team has exactly five non-missing z-scores.
+- Each standardized feature has mean approximately zero and population standard deviation approximately one; all printed deviations from the targets were zero to 12 decimal places.
+- The closest pair is Liverpool and Tottenham Hotspur at distance `0.6199`. Their absolute gaps are only `0.1004`, `0.2072`, `0.0179`, and `0.1959` standard deviations on Territory, Verticality, Pressing, and Width respectively; their largest gap is Counterattacking Tendency at `0.5409`.
+
+### Selected results and plausibility
+
+- Leicester City's closest team is West Ham United at `2.0470`, followed by Newcastle United (`2.1183`) and Southampton (`2.1837`). Leicester is not especially close to any team: versus West Ham it differs by `1.5647` standard deviations in Verticality and `1.1145` in Counterattacking Tendency. This is plausible given Leicester's unusual vertical and counterattacking profile, but the “nearest” label should not be mistaken for a close match.
+- Manchester United's closest team is AFC Bournemouth at `2.0224`, followed by Manchester City (`2.4702`) and Arsenal (`2.5999`). Bournemouth matches United closely on standardized Pressing and Width but differs by `1.5769` standard deviations in Territory. This result is mathematically coherent but not an obvious whole-football comparison, illustrating the limits of five equally weighted event proxies.
+- Arsenal's closest team is Chelsea at `1.6965`. They are within `0.46` standard deviations on Territory, Verticality, Pressing, and Width, but differ by `1.5470` on Counterattacking Tendency. The pairing is plausible across four dimensions but contains one important tactical difference.
+- Liverpool and Tottenham are mutual nearest neighbours at `0.6199`, a highly plausible result within this fingerprint because four dimensions are extremely close and the fifth differs moderately.
+- Tottenham's next closest teams after Liverpool are Chelsea (`2.0686`) and Southampton (`2.7678`), leaving a large separation between the strongest match and the alternatives.
+
+### Diagnostic sensitivity checks
+
+- Ran 0–1 min-max scaling plus Euclidean distance only as a diagnostic. It produced the same top-three neighbour set for 19 of 20 teams, with a mean overlap of `2.95 / 3`. Arsenal was the only changed set: Everton replaced Stoke City in third place. All 20 teams retained the same nearest neighbour. This indicates the primary rankings are not highly dependent on choosing z-score rather than min-max scaling for this dataset.
+- Temporarily recalculated z-score Euclidean distance without Attacking Width. Only 2 of 20 teams retained exactly the same top-three set, mean overlap fell to `1.70 / 3`, and 8 teams retained only one of their primary top-three neighbours. The nearest neighbour remained the same for 11 of 20 teams.
+- The Width ablation therefore shows material sensitivity to Attacking Width. This is consistent with giving its compressed raw spread unit variance. It is not an automatic reason to remove the selected feature, but it is a substantive limitation to disclose and revisit after the MVP.
+- Saved both diagnostic comparisons to `data/processed/premier_league_2015_16_similarity_sensitivity_checks.csv`. Neither diagnostic scaling is a second production model.
+- The requested five-feature z-score method remains the primary model. No 0–100 similarity index was invented.
+- Frontend work, Featherless integration, deployment, and Devpost materials were not started.
