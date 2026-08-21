@@ -699,3 +699,40 @@ Fields used:
 - Re-ran the real Liverpool–Tottenham `/explain` request successfully: HTTP 200 in approximately 21.2 seconds using `Qwen/Qwen3.8-27B`.
 - The returned explanation named both teams, referred to all five dimensions, correctly treated the `0.620` Euclidean distance as a distance rather than a probability, identified the counterattacking gap as the largest difference, and disclosed the model's important limitations. It did not introduce obvious unsupported player, manager, formation, results, or history claims.
 - The real API revealed meaningful latency but did not exceed the existing 35-second backend timeout. The non-AI routes remained healthy throughout failed provider attempts.
+
+## 2026-08-21 — Public production deployment
+
+### Deployment sources and services
+
+- Merged the Featherless production fix through PR #2 with a normal merge commit (`13455c8`) and used `main` as the production source.
+- Deployed the FastAPI backend on Render at `https://tactical-style-fingerprint-api.onrender.com` using the repository's processed CSV files and the configured `/health` check.
+- Configured the server-only Render variables `FEATHERLESS_API_KEY` and `FEATHERLESS_MODEL`, with model `Qwen/Qwen3.8-27B`. The key was never added to Git or frontend configuration.
+- Deployed the Next.js frontend from the repository's `frontend/` directory on Vercel at `https://tactical-style-fingerprint.vercel.app`.
+- Built the frontend with `NEXT_PUBLIC_API_BASE_URL=https://tactical-style-fingerprint-api.onrender.com`.
+- After the frontend URL was stable, configured Render's `FRONTEND_ORIGIN` and `APP_PUBLIC_URL` to the exact Vercel origin. The backend returns an allow-origin header for that origin and none for an unrelated origin.
+
+### Public API and AI validation
+
+- Confirmed public HTTP 200 responses for `/health`, `/teams`, Leicester City's fingerprint, Liverpool's neighbours, and the Liverpool–Tottenham comparison.
+- `/teams` returned all 20 teams. Liverpool's first neighbour remained Tottenham Hotspur and both the neighbour and comparison routes returned distance `0.619924`.
+- Confirmed a real public `POST /explain` response using `Qwen/Qwen3.8-27B`. Direct public latency was approximately 26.4 seconds; a later end-to-end frontend generation completed in roughly 20 seconds on a warm backend.
+- The explanation used the supplied five calculated dimensions and limitations, described distance as distance rather than a probability, and did not introduce obvious unsupported player, manager, formation, result, or history claims.
+- The browser bundle contained the intended public Render base URL but did not contain the Featherless key environment-variable name, Featherless provider endpoint, or an authorization-header literal.
+
+### Production smoke test
+
+- Loaded the deployed site in a fresh browser tab with Leicester City selected by default and confirmed its fingerprint, five nearest neighbours, comparison panel, and real Featherless explanation.
+- Switched to Liverpool and confirmed Tottenham Hotspur remained the closest neighbour at displayed distance `0.620`.
+- Switched the comparison to Chelsea and confirmed the displayed raw distance changed to `1.961`.
+- Refreshed the application, selected Liverpool again, and reproduced the Tottenham `0.620` result.
+- Tested a 375-by-812-pixel viewport. The document and body widths remained below the 375-pixel viewport width, with no horizontal overflow observed.
+- Recorded no browser console warnings or errors during the public journey.
+- Public CORS, data routes, comparison behaviour, AI generation, and post-refresh behaviour passed. Existing automated tests continue to cover contained explanation failures so a provider error does not remove the non-AI analysis.
+
+### Remaining production risks
+
+- Render's free service can sleep while idle, so a cold first request may add substantial delay before the backend begins the 20–26-second Featherless request.
+- The 35-second Featherless timeout covers the provider call after the backend receives it; it does not eliminate hosting cold-start latency.
+- The five-per-ten-minute explanation limiter is in memory. It is appropriate for this single-instance hackathon MVP, but it resets on restart and would not coordinate across multiple instances.
+- Provider availability and model availability remain external dependencies. Fingerprints, neighbours, and comparisons remain usable if explanations fail.
+- Demo video and Devpost work were not started.
