@@ -108,6 +108,12 @@ If Featherless is missing, unavailable, times out, or rejects the configured mod
 
 ## Production deployment
 
+The public hackathon MVP is deployed at:
+
+- Frontend: <https://tactical-style-fingerprint.vercel.app>
+- Backend API: <https://tactical-style-fingerprint-api.onrender.com>
+- API health: <https://tactical-style-fingerprint-api.onrender.com/health>
+
 The included `render.yaml` defines the FastAPI service for Render. Connect the GitHub repository, create the Blueprint, and set the secret/configuration values in Render rather than in Git:
 
 ```dotenv
@@ -148,3 +154,4 @@ npm run build
 - `FRONTEND_ORIGIN` must match the deployed frontend for browser CORS requests.
 - The configured Featherless model must be available on the account's plan and not blocked by a provider gate.
 - The in-memory explanation limiter resets on backend restart and does not coordinate across multiple backend instances.
+- The backend currently uses Render's free service tier, so it may spin down while idle. The first request after an idle period can take substantially longer than a warm request.
