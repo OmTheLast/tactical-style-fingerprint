@@ -530,3 +530,36 @@ Fields used:
 - A future robustness check could implement the independent fast-transition definition from Option 1 using a fixed time window and final-third progression rule.
 - This is the fifth and final tactical metric for the hackathon MVP. There is no feature #6.
 - Normalization, similarity modelling, AI explanations, frontend work, and deployment were not started.
+
+## 2026-08-21 — Combined raw fingerprint dataset and feature audit
+
+### Combined dataset
+
+- Added `analysis/build_raw_fingerprints.py` to read the five season-level processed CSVs, select one raw metric column from each, and merge them on `team`.
+- Used pandas `merge(..., validate="one_to_one")` so the script fails if either side contains duplicate team keys.
+- Verified that every input contains exactly 20 rows and 20 unique teams, that all five team-name sets are identical, and that the selected values are present and numeric.
+- Saved the 20-row result to `data/processed/premier_league_2015_16_raw_tactical_fingerprints.csv` with the five raw metrics unchanged. No normalized columns or team-similarity values were created.
+
+### Raw feature audit
+
+- Calculated minimum, maximum, arithmetic mean, population standard deviation (`ddof=0`), and range for each raw feature.
+- Attacking Territory Share: minimum 34.7000, maximum 68.6000, mean 49.5200, standard deviation 9.9560, range 33.9000.
+- Pass Verticality: minimum 0.2795, maximum 0.4445, mean 0.3526, standard deviation 0.0507, range 0.1650.
+- High-Zone Pressures per 100 Opposition Passes: minimum 24.7770, maximum 38.3690, mean 29.1252, standard deviation 4.0210, range 13.5920.
+- Mean Final-Third Destination Width: minimum 20.3170, maximum 22.9500, mean 21.7034, standard deviation 0.7811, range 2.6330.
+- From-Counter Possession Rate: minimum 3.2570, maximum 6.9140, mean 4.8239, standard deviation 1.0426, range 3.6570.
+- Calculated the Pearson correlation matrix across the 20 teams. The strongest relationship is Attacking Territory versus Pass Verticality at `-0.839`. This is a meaningful overlap warning: teams with more territorial control in this season generally passed less vertically, although the two raw definitions are not identical.
+- Attacking Territory and Pressing Intensity correlate at `0.689`; Pass Verticality and Pressing Intensity correlate at `-0.590`. These may reflect a broader control-versus-directness pattern, but correlation does not establish causation.
+- Attacking Width has correlations close to zero with the other four features. Its raw season-level spread is comparatively narrow: a 2.633-coordinate-unit range and 0.781 standard deviation around a 21.703 mean. It is distinct, but scaling it to equal influence could amplify small or noisy width differences, so this should be revisited with a sensitivity check rather than silently removing the feature.
+- From-Counter Possession Rate is also weakly correlated with the other features, supporting its role as a separate dimension.
+- Using an absolute population z-score of 2 only as an audit flag, Liverpool (`38.369`, z = `2.30`) and Tottenham Hotspur (`38.297`, z = `2.28`) stand out on the pressing metric, while Leicester City (`6.914`, z = `2.00`) stands out on the counterattacking metric. These values were not removed or changed; they are plausible football results rather than evidence of broken rows.
+- With only 20 teams, correlation estimates are descriptive and season-specific. The current evidence is sufficient to proceed cautiously, with the Territory–Verticality overlap and compressed Width spread explicitly retained as concerns for the modelling decision.
+
+### Normalization and similarity proposals only
+
+- Considered z-score standardization plus Euclidean distance as the clearest MVP approach: each metric becomes the number of league standard deviations above or below its mean, then the five squared coordinate differences are summed and square-rooted.
+- Considered 0–1 min-max scaling plus Euclidean or Manhattan distance as a more bounded and visually intuitive alternative. It is sensitive to the season's minimum and maximum and stretches the narrow Width range across the full scale.
+- Considered median/IQR robust scaling plus Manhattan distance as an outlier-resistant comparison. It is less immediately intuitive for a hackathon explanation and produces unbounded values.
+- Equal scaling gives each stored column comparable numerical influence, but correlated columns can still double-count a shared tactical pattern. Five equal feature weights are a transparent MVP assumption, not a scientifically proven model of football style.
+- Any future user-facing score should be labelled a relative similarity index, not a probability or a percentage of tactical identity. Raw distance, nearest-team rank, or a documented bounded transformation can be shown without claiming that a team is a scientifically meaningful percentage “identical” to another.
+- No normalization, pairwise team distance, similarity ranking, frontend, AI explanation, or deployment work was implemented in this stage.
