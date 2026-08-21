@@ -613,3 +613,55 @@ Fields used:
 - Saved both diagnostic comparisons to `data/processed/premier_league_2015_16_similarity_sensitivity_checks.csv`. Neither diagnostic scaling is a second production model.
 - The requested five-feature z-score method remains the primary model. No 0–100 similarity index was invented.
 - Frontend work, Featherless integration, deployment, and Devpost materials were not started.
+
+## 2026-08-21 — Local MVP application
+
+### Frozen model and milestone
+
+- Accepted the five-feature similarity engine and froze the hackathon MVP methodology: five equal-weight population z-scores and Euclidean distance.
+- Committed and pushed the accepted similarity engine as commit `d0887a3` before beginning product work.
+- No feature was added, removed, reweighted, or redesigned.
+- Preserved all four required limitations in the API and interface: Territory/Verticality correlation, Width sensitivity, five-feature incompleteness, and the fact that nearest does not necessarily mean close.
+
+### Architecture created
+
+- Added a Next.js 16 App Router frontend under `frontend/` and a Python FastAPI backend under `backend/`.
+- Kept the data pipeline offline. The backend loads the validated standardized fingerprint and pairwise-distance CSVs once through cached data-access functions rather than recalculating 380 matches per request.
+- Added explicit CORS configuration for the local Next.js origins and a configurable deployed `FRONTEND_ORIGIN`.
+- Added `.env.example` with placeholders only, ignored local environment files, Python virtual environments, Node dependencies, and build outputs.
+
+### Backend API
+
+- Added `GET /health`, `GET /teams`, `GET /teams/{team}/fingerprint`, `GET /teams/{team}/neighbours`, `GET /compare`, and `POST /explain`.
+- Fingerprint responses preserve raw values and internal z-scores but also provide a visualization-only 0–100 league-relative min-max value. Zero is the observed season minimum and 100 the maximum; the transformation does not enter the frozen similarity model.
+- Neighbour and comparison responses expose raw Euclidean distance plus signed and absolute feature-level z-score gaps so users can inspect why teams are close or different.
+
+### Featherless integration
+
+- Added a backend-only call to Featherless's OpenAI-compatible `/v1/chat/completions` endpoint using `httpx`.
+- `FEATHERLESS_API_KEY` and `FEATHERLESS_MODEL` are read from server environment variables and are never referenced by frontend code.
+- The request contains structured calculated evidence: both fingerprints, raw and z-scored values, signed differences, Euclidean distance, metric definitions, and known limitations.
+- The system prompt prohibits invented player, manager, formation, match, history, or trophy facts; quality claims; and probability interpretations. It requires measured evidence to be separated from cautious interpretation.
+- Missing configuration, timeouts, provider HTTP errors, network errors, malformed responses, and empty responses become contained explanation errors. The fingerprint, neighbours, and comparison continue working.
+- A live Featherless response was not tested because no API key or model was supplied. The successful response path and failure isolation were tested with backend mocks.
+
+### Frontend user journey
+
+- Built one responsive focused analytics page with a 20-team selector, SVG tactical radar, five league-relative metric cards, nearest-neighbour cards, clickable comparison selection, overlaid comparison radar, raw values, signed z-score gaps, and a grounded explanation panel.
+- The interface explicitly labels the 0–100 values as league-relative visualization values and raw Euclidean distance as neither a probability nor percentage.
+- Added a limitations section visible in the product rather than leaving methodology cautions only in documentation.
+
+### Verification completed
+
+- Backend: 7 API/data-grounding tests pass, covering 20-team loading, five-feature payloads, display bounds, known Liverpool–Tottenham distance, invalid teams, mocked explanation success, failure isolation, and structured grounding evidence.
+- Frontend: ESLint passes and the optimized Next.js production build completes with TypeScript checks.
+- Local browser journey: Leicester loads by default; changing to Liverpool updates the fingerprint and correctly shows Tottenham first at `0.620`; selecting Chelsea changes the comparison distance to `1.961`; requesting an explanation without credentials shows a useful configuration error while the comparison remains visible.
+- Visual checks passed at the normal desktop viewport and at a 375-pixel-wide mobile viewport with no horizontal overflow. No browser console warnings or errors were recorded.
+
+### Current limits and deployment risks
+
+- The complete local non-AI journey works. A real AI explanation still requires the user to supply valid Featherless credentials and an available model.
+- Deployment is not yet configured. The frontend and backend require compatible Node/Python hosting, correct cross-origin configuration, bundled processed CSVs, and Featherless outbound access.
+- `NEXT_PUBLIC_API_BASE_URL` is embedded at frontend build time and must point at the deployed backend.
+- A public deployment should add rate limiting to `/explain` to reduce abuse and inference-cost risk.
+- Demo video and Devpost work were not started.

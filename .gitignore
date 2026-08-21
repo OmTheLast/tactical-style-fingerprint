@@ -7,3 +7,17 @@ __pycache__/
 
 # Downloaded provider data is a reproducible local cache, not repository source.
 data/raw/
+
+# Local secrets and runtime environments must not be committed.
+.env
+.env.local
+.venv/
+
+# Next.js and Node build/install output.
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+*.log
+
+# Local operating-system files.
+.DS_Store
