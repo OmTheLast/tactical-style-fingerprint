@@ -665,3 +665,26 @@ Fields used:
 - `NEXT_PUBLIC_API_BASE_URL` is embedded at frontend build time and must point at the deployed backend.
 - A public deployment should add rate limiting to `/explain` to reduce abuse and inference-cost risk.
 - Demo video and Devpost work were not started.
+
+## 2026-08-21 — Production preparation begun
+
+### Clean local MVP milestone
+
+- Re-ran the local verification before deployment: all 7 backend tests passed, frontend lint passed, and the optimized Next.js build completed successfully.
+- Committed and pushed the complete accepted local product as commit `1c78067` (`Build local tactical fingerprint MVP`).
+- Corrected the local Git remote to the repository's current URL after GitHub reported that the old misspelled URL now redirects.
+
+### Production hardening completed locally
+
+- Added a rolling in-memory per-client limit to `POST /explain`, configurable through `EXPLAIN_RATE_LIMIT_REQUESTS` and `EXPLAIN_RATE_LIMIT_WINDOW_SECONDS` and defaulting to 5 attempts per 10 minutes.
+- The limiter returns HTTP 429 with `Retry-After`; it affects only AI explanation requests, so fingerprints, neighbours, and comparisons remain usable.
+- Documented that this is intentionally modest single-instance hackathon protection: it resets when the process restarts and is not distributed across backend instances.
+- Added a regression test for the limit. The expanded backend suite passes 8 tests; frontend lint and production build still pass.
+- Added a Render service definition with an HTTPS health check, runtime command, secret placeholders, exact frontend-origin configuration, and the processed data available from the repository checkout.
+- Expanded the README with backend-first deployment order, server-only Featherless settings, exact CORS origin, and the build-time nature of `NEXT_PUBLIC_API_BASE_URL`.
+
+### Deployment blockers found during verification
+
+- The Featherless key supplied for this stage is not currently present in the ignored local `.env` file or process environment. No live provider request has been claimed or performed yet.
+- Render and Vercel are not currently signed in. Render reached a GitHub authorization screen and requires explicit user approval before granting the hosting service access to the GitHub account; no authorization was submitted.
+- Public deployment and the requested production smoke test have therefore not yet been completed.

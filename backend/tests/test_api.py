@@ -8,6 +8,10 @@ from backend.app.explanations import SYSTEM_PROMPT, explanation_evidence
 client = TestClient(main.app)
 
 
+def setup_function() -> None:
+    main.explain_attempts.clear()
+
+
 def test_health_and_teams() -> None:
     health = client.get("/health")
     assert health.status_code == 200
@@ -79,6 +83,26 @@ def test_explain_failure_does_not_affect_comparison(monkeypatch) -> None:
 
     comparison = client.get(
         "/compare", params={"team_a": "Arsenal", "team_b": "Chelsea"}
+    )
+    assert comparison.status_code == 200
+
+
+def test_explain_rate_limit_contains_ai_abuse(monkeypatch) -> None:
+    async def fake_generate(comparison: dict) -> tuple[str, str]:
+        return "Grounded test explanation.", "test/model"
+
+    monkeypatch.setattr(main, "generate_explanation", fake_generate)
+    monkeypatch.setattr(main, "EXPLAIN_RATE_LIMIT_REQUESTS", 2)
+    payload = {"team_a": "Liverpool", "team_b": "Tottenham Hotspur"}
+
+    assert client.post("/explain", json=payload).status_code == 200
+    assert client.post("/explain", json=payload).status_code == 200
+    limited = client.post("/explain", json=payload)
+    assert limited.status_code == 429
+    assert int(limited.headers["retry-after"]) >= 1
+
+    comparison = client.get(
+        "/compare", params={"team_a": "Liverpool", "team_b": "Tottenham Hotspur"}
     )
     assert comparison.status_code == 200
 

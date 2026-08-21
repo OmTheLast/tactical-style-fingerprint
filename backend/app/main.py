@@ -1,9 +1,12 @@
 import os
+import time
+from collections import defaultdict, deque
 from pathlib import Path
+from threading import Lock
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -46,6 +49,44 @@ app.add_middleware(
 class ExplanationRequest(BaseModel):
     team_a: str
     team_b: str
+
+
+def positive_int_environment(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+EXPLAIN_RATE_LIMIT_REQUESTS = positive_int_environment(
+    "EXPLAIN_RATE_LIMIT_REQUESTS", 5
+)
+EXPLAIN_RATE_LIMIT_WINDOW_SECONDS = positive_int_environment(
+    "EXPLAIN_RATE_LIMIT_WINDOW_SECONDS", 600
+)
+explain_attempts: defaultdict[str, deque[float]] = defaultdict(deque)
+explain_attempts_lock = Lock()
+
+
+def explanation_client_id(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        return forwarded_for.split(",", maxsplit=1)[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def check_explanation_rate_limit(client_id: str) -> int | None:
+    now = time.monotonic()
+    cutoff = now - EXPLAIN_RATE_LIMIT_WINDOW_SECONDS
+    with explain_attempts_lock:
+        attempts = explain_attempts[client_id]
+        while attempts and attempts[0] <= cutoff:
+            attempts.popleft()
+        if len(attempts) >= EXPLAIN_RATE_LIMIT_REQUESTS:
+            return max(1, int(EXPLAIN_RATE_LIMIT_WINDOW_SECONDS - (now - attempts[0])))
+        attempts.append(now)
+    return None
 
 
 def not_found(team: str) -> HTTPException:
@@ -92,11 +133,22 @@ def compare(team_a: str, team_b: str) -> dict:
 
 
 @app.post("/explain")
-async def explain(request: ExplanationRequest) -> dict:
-    if request.team_a == request.team_b:
+async def explain(payload: ExplanationRequest, request: Request) -> dict:
+    retry_after = check_explanation_rate_limit(explanation_client_id(request))
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Too many explanation requests. The tactical data remains "
+                "available; wait before requesting another AI explanation."
+            ),
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    if payload.team_a == payload.team_b:
         raise HTTPException(status_code=400, detail="Choose two different teams")
     try:
-        comparison = comparison_payload(request.team_a, request.team_b)
+        comparison = comparison_payload(payload.team_a, payload.team_b)
     except KeyError as error:
         raise not_found(str(error.args[0])) from None
 
@@ -128,8 +180,8 @@ async def explain(request: ExplanationRequest) -> dict:
         ) from None
 
     return {
-        "team_a": request.team_a,
-        "team_b": request.team_b,
+        "team_a": payload.team_a,
+        "team_b": payload.team_b,
         "model": model,
         "explanation": explanation,
         "grounding_note": (

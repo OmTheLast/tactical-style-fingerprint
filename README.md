@@ -104,6 +104,27 @@ The explanation request includes both teams' raw and standardized values, signed
 
 If Featherless is missing, unavailable, times out, or rejects the configured model, `/explain` returns a useful error. The other endpoints and the frontend comparison remain operational.
 
+`POST /explain` is limited by default to five attempts per client in a rolling ten-minute window. This small in-memory control is suitable for a single-instance hackathon deployment: it prevents accidental request spam, but resets when the backend restarts and is not a substitute for distributed production rate limiting.
+
+## Production deployment
+
+The included `render.yaml` defines the FastAPI service for Render. Connect the GitHub repository, create the Blueprint, and set the secret/configuration values in Render rather than in Git:
+
+```dotenv
+FEATHERLESS_API_KEY=<secret>
+FEATHERLESS_MODEL=<available Featherless model ID>
+FRONTEND_ORIGIN=https://<deployed-frontend-origin>
+APP_PUBLIC_URL=https://<deployed-frontend-origin>
+```
+
+Deploy the backend first and verify its `/health` endpoint. Then deploy `frontend/` on Vercel with this build-time variable:
+
+```dotenv
+NEXT_PUBLIC_API_BASE_URL=https://<deployed-backend-origin>
+```
+
+When the frontend URL is known, update `FRONTEND_ORIGIN` and `APP_PUBLIC_URL` on the backend to that exact HTTPS origin. Changing `NEXT_PUBLIC_API_BASE_URL` requires rebuilding the frontend because Next.js embeds public environment variables in the browser bundle at build time.
+
 ## Verification
 
 ```bash
@@ -120,11 +141,10 @@ npm run build
 - Five event-data-derived dimensions cannot describe the whole tactical behaviour of a football team.
 - “Nearest” means least distant among the available teams; it does not guarantee a close match.
 
-## Deployment risks to handle next
+## Production limitations
 
-- The frontend and backend need separate deployments or a platform that supports both Node and Python services.
 - The backend host must include the processed CSV files and allow outbound HTTPS to Featherless.
 - `NEXT_PUBLIC_API_BASE_URL` is embedded when the frontend is built, so it must be correct for the deployed environment.
 - `FRONTEND_ORIGIN` must match the deployed frontend for browser CORS requests.
 - The configured Featherless model must be available on the account's plan and not blocked by a provider gate.
-- Before a public launch, `/explain` should receive basic rate limiting to control abuse and inference cost.
+- The in-memory explanation limiter resets on backend restart and does not coordinate across multiple backend instances.
