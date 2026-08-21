@@ -77,6 +77,7 @@ async def generate_explanation(comparison: dict) -> tuple[str, str]:
                 ),
             },
         ],
+        "chat_template_kwargs": {"enable_thinking": False},
         "temperature": 0.2,
         "max_tokens": 700,
     }

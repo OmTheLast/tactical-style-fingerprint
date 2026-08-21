@@ -688,3 +688,14 @@ Fields used:
 - The Featherless key supplied for this stage is not currently present in the ignored local `.env` file or process environment. No live provider request has been claimed or performed yet.
 - Render and Vercel are not currently signed in. Render reached a GitHub authorization screen and requires explicit user approval before granting the hosting service access to the GitHub account; no authorization was submitted.
 - Public deployment and the requested production smoke test have therefore not yet been completed.
+
+## 2026-08-21 — Live Featherless validation
+
+- Merged PR #1 into `main` using a normal merge commit (`37b5c9a`) so the metric, similarity, product, and production-preparation commits remain visible in history.
+- Re-ran verification on the merged `main`: 8 backend tests passed, frontend lint passed, and the optimized frontend build passed. The working tree was clean, `.env` remained ignored/untracked, and tracked Featherless assignments contained placeholders only.
+- The first real Featherless request failed with HTTP 401 because the local credential/model configuration was incomplete. After the local configuration was corrected, a minimal call to `Qwen/Qwen3.8-27B` returned HTTP 200.
+- A realistic first `/explain` attempt reached the model but returned empty visible content after about 20.6 seconds. The provider response showed that this Qwen reasoning model was using thinking mode for a task that only needs concise interpretation.
+- Added Featherless's documented `chat_template_kwargs: {"enable_thinking": false}` request setting. This keeps the model focused on explaining the already-calculated evidence rather than spending the completion budget on hidden reasoning.
+- Re-ran the real Liverpool–Tottenham `/explain` request successfully: HTTP 200 in approximately 21.2 seconds using `Qwen/Qwen3.8-27B`.
+- The returned explanation named both teams, referred to all five dimensions, correctly treated the `0.620` Euclidean distance as a distance rather than a probability, identified the counterattacking gap as the largest difference, and disclosed the model's important limitations. It did not introduce obvious unsupported player, manager, formation, results, or history claims.
+- The real API revealed meaningful latency but did not exceed the existing 35-second backend timeout. The non-AI routes remained healthy throughout failed provider attempts.
