@@ -441,3 +441,92 @@ Fields used:
 - The metric records where selected attacking actions end, not whether they are useful, dangerous, or successful.
 - It cannot observe off-ball positioning and does not distinguish productive width from harmless wide circulation.
 - Tactical feature #5, similarity modelling, normalization, AI explanations, frontend work, and deployment were not started.
+
+## 2026-08-20 — Attacking Transition definition investigation
+
+### Status
+
+- Tactical feature #4 was committed and pushed as commit `8e9c500` before beginning this investigation.
+- Investigated three possible definitions for the fifth and final MVP tactical metric:
+  1. fast final-third transition attempts after open-play possession changes;
+  2. possession-level net progression speed;
+  3. StatsBomb From-Counter possession rate.
+- No Attacking Transition definition has been selected or implemented yet.
+- There will be no tactical feature #6 for the hackathon MVP.
+
+### Possession and play-pattern audit
+
+- StatsBomb supplies `possession`, `possession_team`, `play_pattern`, ordered event `index`, timestamps, locations, and type-specific Pass/Carry endpoints needed for the candidate definitions.
+- The 380 matches contain 71,884 raw possession IDs. Their initial play-pattern counts include 28,550 Regular Play and 1,326 From Counter possessions, alongside kick-offs, free kicks, corners, throw-ins, goal kicks, keeper starts, and Other patterns.
+- The data contains 12,617 event rows tagged From Counter, but event-row count is not a defensible team tendency denominator because longer counters generate more rows.
+- Play pattern can change within a StatsBomb possession: 813 possessions contain both From Counter and Regular Play. In inspected examples, the possession begins From Counter and changes to Regular Play when the initial transition phase ends.
+- A provider-based possession classification should therefore use the initial meaningful possession-team on-ball event, rather than require every event in the possession to share one label.
+- Of the 1,326 possessions initially labelled From Counter, 426 contain a Shot. A possession-share definition can count the many non-shot counterattacks too, avoiding a success-only feature.
+- Common fields required for grouping and timing (`possession`, `possession_team`, `play_pattern`, `minute`, `second`, and `timestamp`) were present throughout the season files.
+
+### Options under consideration
+
+- **Fast final-third transition-attempt rate:** among open-play possession changes where the new team differs from the previous possession team and starts below `x = 80`, count the share that produces a Pass/Carry endpoint at `x >= 80` or any Shot within 10 seconds. Unsuccessful Pass attempts into the final third would count. This directly measures fast post-regain attacking intent but requires several boundary, event-resolution, and time-threshold decisions.
+- **Open-play net progression speed:** over eligible non-set-piece possessions with positive measured duration, divide total net possession progression `sum(final_x - start_x)` by total possession duration in seconds. This incorporates Passes, Carries, and time, but primarily measures general possession progression tempo rather than counterattacking frequency. Restricting it to From Counter possessions would make it provider-dependent and describe speed conditional on countering, not tendency to counter.
+- **From-Counter possession rate:** count possession changes whose initial meaningful on-ball event is tagged `play_pattern.name == "From Counter"`, divided by eligible open-play possession changes, expressed per 100. Every annotated counter possession counts regardless of whether it reaches the final third or produces a Shot.
+
+### Current recommendation and cautions
+
+- From-Counter possession rate is the current hackathon recommendation because it is transparent, fast to implement, distinct from Pass Verticality, counts failed/non-shot counters, and directly represents how often eligible possessions begin as provider-identified counters.
+- Its main weakness is reliance on StatsBomb's contextual annotation and an externally defined classification rather than a fully reproducible 10-second rule.
+- Fast final-third transition-attempt rate is the strongest custom alternative but is more complex and sensitive to the 10-second window, `x = 80` boundary, regain definition, and treatment of possessions beginning high up the pitch.
+- All options are affected by score state and opponent behaviour: teams cannot counter frequently if opponents rarely commit players forward or lose the ball in transition-friendly situations.
+- None observes off-ball sprinting, opponent defensive shape, numerical superiority, or every attempted run without tracking data.
+- No implementation should begin until an option is selected. Normalization, similarity modelling, AI explanations, frontend work, and deployment remain unstarted.
+
+## 2026-08-21 — Tactical feature #5: From-Counter Possession Rate
+
+### Decision
+
+- Selected the provider-annotation option. The user-facing tactical dimension is **Counterattacking Tendency**, while the underlying raw metric remains **From-Counter Possession Rate**.
+- The fixed formula is:
+
+  `100 * possessions beginning From Counter / eligible open-play possession changes`
+
+- Each `(match_id, period, possession)` is classified once. Individual From Counter event rows are not counted.
+- A meaningful possession-team on-ball event is the first event attributed to `possession_team` whose type is one of: 50/50, Ball Receipt, Ball Recovery, Carry, Clearance, Dispossessed, Dribble, Duel, Goal Keeper, Interception, Miscontrol, Pass, Shield, or Shot.
+- An eligible possession is not the first possession of its period, has a different `possession_team` from the preceding possession in that period, has a meaningful possession-team on-ball event, and that event's initial play pattern is Regular Play or From Counter.
+- A qualifying counter possession is an eligible possession whose initial meaningful event is tagged `play_pattern.name == "From Counter"`.
+- A possession remains one counter possession if later events switch to Regular Play.
+- The rate is per 100 eligible possession changes, not a generic percentage of all possessions.
+- Goals, xG, shots, final-third arrival, action outcomes, and attack success do not enter the formula.
+
+### Shared classifier and edge handling
+
+- Added `analysis/from_counter_possessions.py` so the one-match and season scripts reuse the exact same possession classification logic.
+- Possessions are ordered by event `index` within each period and keyed by match, period, and possession ID.
+- First-of-period possessions, same-team possession continuations, restart/non-open-play patterns, and possessions without a meaningful on-ball event are excluded with explicit flags.
+- The 93 season possessions with no meaningful on-ball event were audited. All were `Other` play pattern and involved Referee Ball-Drop sequences; none contained a From Counter event row.
+
+### One-match implementation and validation
+
+- Added `analysis/from_counter_rate_one_match.py` for Manchester United vs Tottenham Hotspur, match `3754097`.
+- Manchester United: 42 eligible open-play possession changes, 3 From-Counter possessions, rate 7.14 per 100.
+- Tottenham Hotspur: 41 eligible changes, 2 From-Counter possessions, rate 4.88 per 100.
+- Inspected counter and regular examples with their preceding team, initial event, player, timestamp, location, initial play pattern, event count, and later pattern-change flag.
+- Three of Manchester United/Tottenham's five counter possessions later change to Regular Play, but each is counted exactly once.
+- The match contains 72 same-team continuations and 40 restart/non-open-play changes that are correctly excluded, plus the two first possessions of periods.
+
+### Full-season implementation
+
+- Added `analysis/from_counter_rate_season.py` and saved its output to `data/processed/from_counter_possession_rate_2015_16.csv`.
+- All 20 teams have complete 38/38 match coverage, positive eligible denominators, counter counts no greater than eligible counts, and rates within the valid 0-to-100 range. No team received a suspicious validation flag.
+- The classifier found 27,325 eligible open-play possession changes and 1,320 From-Counter possession starts.
+- Leicester City ranked first with 93 / 1,345 = 6.91 per 100, followed by Southampton at 6.39 and Tottenham Hotspur at 5.89.
+- Manchester United ranked 18th at 3.48, Stoke City 19th at 3.43, and West Bromwich Albion 20th at 3.26.
+
+### Interpretation and limitations
+
+- A high value means a larger share of the team's eligible open-play possession changes begin with a provider-labelled counterattacking phase. A low value means more begin as Regular Play. High is not better and low is not worse.
+- Failed, aborted, and non-shot counter possessions count equally. This keeps the metric focused on style rather than attacking output.
+- This feature relies on StatsBomb's provider-defined From Counter annotation. The exact classification logic is not ours, may contain contextual judgement, and may not transfer directly to another provider.
+- Score state, opponent risk-taking, defensive depth, and turnover locations affect the opportunities available to counterattack.
+- Event data cannot observe off-ball runs, numerical superiority, defensive shape, or transition opportunities that a team declines without an on-ball event.
+- A future robustness check could implement the independent fast-transition definition from Option 1 using a fixed time window and final-third progression rule.
+- This is the fifth and final tactical metric for the hackathon MVP. There is no feature #6.
+- Normalization, similarity modelling, AI explanations, frontend work, and deployment were not started.
