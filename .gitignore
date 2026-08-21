@@ -1,0 +1,23 @@
+# Local learning notes are intentionally private and must never be committed.
+private_notes/
+
+# Python cache files are generated locally and should not be versioned.
+__pycache__/
+*.py[cod]
+
+# Downloaded provider data is a reproducible local cache, not repository source.
+data/raw/
+
+# Local secrets and runtime environments must not be committed.
+.env
+.env.local
+.venv/
+
+# Next.js and Node build/install output.
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+*.log
+
+# Local operating-system files.
+.DS_Store

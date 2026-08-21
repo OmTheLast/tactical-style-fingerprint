@@ -1,0 +1,21 @@
+rank,team,matches_represented,expected_matches,eligible_open_play_possession_changes,from_counter_possessions,counter_possessions_later_regular,from_counter_possession_rate,coverage_flag,validation_flag
+1,Leicester City,38,38,1345,93,59,6.914,OK,OK
+2,Southampton,38,38,1408,90,67,6.392,OK,OK
+3,Tottenham Hotspur,38,38,1410,83,46,5.887,OK,OK
+4,Manchester City,38,38,1363,80,50,5.869,OK,OK
+5,West Ham United,38,38,1356,78,52,5.752,OK,OK
+6,Everton,38,38,1353,75,51,5.543,OK,OK
+7,Newcastle United,38,38,1364,75,42,5.499,OK,OK
+8,Chelsea,38,38,1404,75,52,5.342,OK,OK
+9,Liverpool,38,38,1503,80,54,5.323,OK,OK
+10,Watford,38,38,1305,64,31,4.904,OK,OK
+11,Sunderland,38,38,1272,58,37,4.560,OK,OK
+12,AFC Bournemouth,38,38,1390,62,36,4.460,OK,OK
+13,Crystal Palace,38,38,1353,59,32,4.361,OK,OK
+14,Aston Villa,38,38,1294,54,26,4.173,OK,OK
+15,Norwich City,38,38,1301,50,22,3.843,OK,OK
+16,Swansea City,38,38,1305,49,24,3.755,OK,OK
+17,Arsenal,38,38,1448,54,28,3.729,OK,OK
+18,Manchester United,38,38,1464,51,33,3.484,OK,OK
+19,Stoke City,38,38,1428,49,28,3.431,OK,OK
+20,West Bromwich Albion,38,38,1259,41,22,3.257,OK,OK

@@ -1,0 +1,21 @@
+rank,team,matches_represented,expected_matches,qualifying_high_zone_pressures,qualifying_opposition_passes,high_zone_pressures_per_100_opposition_passes,coverage_flag
+1,Liverpool,38,38,3777,9844,38.369,OK
+2,Tottenham Hotspur,38,38,3518,9186,38.297,OK
+3,AFC Bournemouth,38,38,3769,11304,33.342,OK
+4,Manchester United,38,38,3307,10065,32.856,OK
+5,Chelsea,38,38,3250,10381,31.307,OK
+6,Manchester City,38,38,3240,10510,30.828,OK
+7,Swansea City,38,38,3255,10853,29.992,OK
+8,Southampton,38,38,3292,11068,29.743,OK
+9,Arsenal,38,38,2992,10113,29.586,OK
+10,Crystal Palace,38,38,3147,10744,29.291,OK
+11,Leicester City,38,38,3358,12389,27.105,OK
+12,Everton,38,38,2872,10614,27.059,OK
+13,Newcastle United,38,38,3014,11208,26.892,OK
+14,Stoke City,38,38,2834,10609,26.713,OK
+15,Aston Villa,38,38,3172,12267,25.858,OK
+16,Watford,38,38,3076,12110,25.400,OK
+17,Norwich City,38,38,2888,11405,25.322,OK
+18,West Ham United,38,38,2696,10803,24.956,OK
+19,Sunderland,38,38,3025,12192,24.811,OK
+20,West Bromwich Albion,38,38,3060,12350,24.777,OK
